@@ -4,10 +4,11 @@ import time
 
 class GenericWorker(Thread):
 
-    def __init__(self, queue, generic_function):
+    def __init__(self, queue, generic_function, should_terminate_func=None):
         Thread.__init__(self)
         self.queue = queue
         self.generic_function = generic_function
+        self.should_terminate_func = should_terminate_func
 
     def run(self):
         while True:
@@ -16,16 +17,22 @@ class GenericWorker(Thread):
                 self.generic_function(data_dict)
             finally:
                 self.queue.task_done()
+            if self.should_terminate_func is not None:
+                if self.should_terminate_func():
+                    print("TERMINATING THE THREAD")
+                    break
                 
 
-def bs_threadify(worker_data_list, worker_func, num_threads=8):
+def bs_threadify(worker_data_list, worker_func, num_threads=8, should_terminate_func=None):
     queue = Queue()
     # Create 8 worker threads
+    all_workers = []
     for x in range(num_threads):
-        worker = GenericWorker(queue, worker_func)
+        worker = GenericWorker(queue, worker_func, should_terminate_func=should_terminate_func)
         # Setting daemon to True will let the main thread exit even though the workers are blocking
         worker.daemon = True
         worker.start()
+        all_workers.append(all_workers)
     # Put the tasks into the queue as a tuple
     for worker_data in worker_data_list:
         queue.put(worker_data)
