@@ -102,7 +102,7 @@ class INDICATORS:
             indicator_params_dict['length'] = 5
         if 'source' not in indicator_params_dict:
             indicator_params_dict['source'] = 'close'
-        indicator_params_dict['unique_selector'] = f"{INDICATORS.MOVING_AVERAGE}_{indicator_params_dict['length']}_{indicator_params_dict['source']}"
+        indicator_params_dict['unique_selector'] = f"{INDICATORS.HISTORICAL_VOLATALITY}_{indicator_params_dict['length']}_{indicator_params_dict['source']}"
         return indicator_params_dict
     
     @staticmethod
@@ -158,7 +158,7 @@ def test():
     csv_location = "input/kite_historical/895745_TATASTEEL_EQ_NSE_NSE_day.csv"
     testdf = pd.read_csv(csv_location)
     get_indicator = INDICATORS.create_get_indicator_func(testdf)
-    hv10 = get_indicator("hv", {'length':15})
+    hv10 = get_indicator("hv", {'length':10})
     print("----------")
     print("-- HV length:10 indicator")
     print(testdf[["date","close",hv10.name]].tail(21))
