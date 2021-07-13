@@ -158,10 +158,14 @@ def test():
     csv_location = "input/kite_historical/895745_TATASTEEL_EQ_NSE_NSE_day.csv"
     testdf = pd.read_csv(csv_location)
     get_indicator = INDICATORS.create_get_indicator_func(testdf)
-    hv10 = get_indicator("hv", {'length':10})
-    print("----------")
+
+    rsi15 = get_indicator("rsi", {'length':15,'source':'close'})
+
+    rsi_vl = get_indicator("hv", {'length':5, 'source':rsi15.name})
+
     print("-- HV length:10 indicator")
-    print(testdf[["date","close",hv10.name]].tail(21))
+    # print(volume_ma.tail(20))
+    print(testdf[["date",rsi15.name,rsi_vl.name]].tail(21))
 
 if __name__ == "__main__":
     test()
