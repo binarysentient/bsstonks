@@ -87,9 +87,9 @@ def black_scholes_volatility(spotprice, strikeprice, transaction_date, expiratio
 #       we're also understanding how the formula's internal variable changes and what each means
 def black_scholes_insight_graphs():
     # Let's figure out how does call price changes at different strikes when volatality changes
-    spotprice = 2000
-    strikestep = 50
-    numberofstrikes = 4
+    spotprice = 2086
+    strikestep = 30
+    numberofstrikes = 5
     volatility_range = [idx/2 for idx in range(1,200)]
     strike_prices = [idx for idx in range(spotprice - strikestep*numberofstrikes, spotprice + strikestep*(numberofstrikes+1), strikestep)]
     fig = plt.figure()
@@ -99,7 +99,7 @@ def black_scholes_insight_graphs():
         call_prices = []
         for ivolatility in volatility_range:    
             callprice, putprice = black_scholes_call(spotprice, strikeprice, datetime.now(), datetime(2021,7,29, 15, 00, 00), ivolatility, 3.44)
-            call_prices.append(callprice)
+            call_prices.append(putprice)
         plt.plot(volatility_range, call_prices,label=f"{strikeprice}")
     plt.xlabel("Volatility")
     plt.ylabel("Call Price")
@@ -126,5 +126,5 @@ def black_scholes_formula_test():
     print("Call ", callprice, "Put", putprice)
 
 if __name__ == "__main__":
-    black_scholes_formula_test()
-    # black_scholes_insight_graphs()
+    # black_scholes_formula_test()
+    black_scholes_insight_graphs()

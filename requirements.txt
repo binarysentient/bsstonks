@@ -1,0 +1,7 @@
+jupyterlab
+notebook
+scipy
+matplotlib
+kiteconnect
+python-dotenv
+python-dateutil

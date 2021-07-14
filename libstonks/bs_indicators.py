@@ -166,6 +166,7 @@ def test():
     print("-- HV length:10 indicator")
     # print(volume_ma.tail(20))
     print(testdf[["date",rsi15.name,rsi_vl.name]].tail(21))
+    print("MEOOOOW")
 
 if __name__ == "__main__":
     test()

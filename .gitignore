@@ -129,5 +129,6 @@ dmypy.json
 .pyre/
 
 #bsstonks specific stuff
+.token.json
 input/
 output/
