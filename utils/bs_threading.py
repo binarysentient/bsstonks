@@ -1,8 +1,11 @@
 import queue
 import queue
+import threading
+import multiprocessing
 from multiprocessing import Process, Queue, JoinableQueue
-from threading import Thread, Lock
+from threading import Thread
 import time
+
 
 class GenericWorker(Thread):
 
@@ -34,8 +37,8 @@ class GenericWorker(Thread):
 #                         print("TERMINATING THE THREAD")
                         break
 
-def bs_multiprocessify(worker_data_list, worker_func, num_threads=8, auto_terminate_duration=10):
-    q = JoinableQueue()
+def bs_multiprocessify(worker_data_list, worker_func, num_processes=8, auto_terminate_duration=10):
+    
     for worker_data in worker_data_list:
         q.put(worker_data)
         
@@ -113,32 +116,12 @@ def bs_make_throttle_ready_func(min_interval_second=1.0/3.0):
         return readystate
     return ready_function
 
-import random
-def rand_num():
-    num = random.random()
-    print(num)
-def dummyfunc(num):
-        print("yo")
-        time.sleep(3.0)
-        print("DONE")
-def f(x):
-    print("yo")
-#     time.sleep(3.0)
-    print("DONE")
-    return x*x
+
+
+
 def main():
-    
-    
+    print("tet")
 
-    
-
-    
-    import multiprocessing
-    from multiprocessing import Process, Queue, JoinableQueue
-    
-    p = Process(target=dummyfunc, args=(3,))
-    p.start()
-    p.join()
 
 if __name__ == "__main__":
     main()

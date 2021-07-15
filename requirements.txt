@@ -5,3 +5,4 @@ matplotlib
 kiteconnect
 python-dotenv
 python-dateutil
+ratelimit

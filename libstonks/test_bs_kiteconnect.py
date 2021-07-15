@@ -1,3 +1,3 @@
-from bs_kiteconnect import get_kite_session
-kite = get_kite_session()
+from bs_kiteconnect import make_kiteconnect_api
+kite = make_kiteconnect_api()
 print(kite.holdings())

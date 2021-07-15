@@ -1,4 +1,3 @@
-
 """
 Zerodha has the following rate limits on the API:
 
@@ -10,6 +9,7 @@ Order modification: 25 modifications per order.
 """
 
 import os
+import kiteconnect
 # import logging
 import requests
 import json
@@ -25,22 +25,38 @@ from kiteconnect import KiteConnect
 from dotenv import load_dotenv
 
 load_dotenv()
-
 KITE_CONNECT_API_KEY = os.getenv("KITE_CONNECT_API_KEY")
 KITE_CONNECT_API_SECRET = os.getenv("KITE_CONNECT_API_SECRET")
+BSSTONKS_DIRECTORY = os.getenv("BSSTONKS_DIRECTORY")
 
 # logging.basicConfig(level=logging.DEBUG)
 
 def _save_kite_access_token(api_key, the_token):
-    with open('.kite_access_token.json','w') as tokenfile:
+    savelocpath = ".kite_access_token.json"
+    if BSSTONKS_DIRECTORY is not None:
+        savelocpath = os.path.join(BSSTONKS_DIRECTORY, savelocpath)
+    with open(savelocpath,'w') as tokenfile:
         json.dump({f'{api_key}':the_token},tokenfile)
 
-def _read_kite_access_token():
-    if not os.path.exists(".kite_access_token.json"):
+def _read_kite_access_token(validate_token=True):
+    tokenmap = None
+    savelocpath = ".kite_access_token.json"
+    if BSSTONKS_DIRECTORY is not None:
+        savelocpath = os.path.join(BSSTONKS_DIRECTORY, savelocpath)
+    if not os.path.exists(savelocpath):
         return None
-    with open('.kite_access_token.json','r') as tokenfile:
+    with open(savelocpath,'r') as tokenfile:
         tokenmap = json.load(tokenfile)
-        return tokenmap
+    if validate_token:
+        if tokenmap is not None:
+            kite = KiteConnect(api_key=KITE_CONNECT_API_KEY)
+            kite.set_access_token(tokenmap[KITE_CONNECT_API_KEY])
+            try:
+                kite.profile()
+                #token is valid if this suceeds
+            except kiteconnect.exceptions.TokenException as tokenexception:
+                return None
+    return tokenmap
 
 def _fetch_access_token_from_request_token(request_token):
     kite = KiteConnect(api_key=KITE_CONNECT_API_KEY)
@@ -142,7 +158,9 @@ class KiteTokenReceiverServerThread(Thread):
 
 
 
-def get_kite_session():
+
+
+def make_kiteconnect_api():
     tokenmap = _read_kite_access_token()
     kite = KiteConnect(api_key=KITE_CONNECT_API_KEY)
     if tokenmap is None:
