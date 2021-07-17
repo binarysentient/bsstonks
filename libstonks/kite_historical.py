@@ -2,16 +2,19 @@ import os
 import time
 import logging
 from datetime import date, datetime, timedelta
+import calendar
 
 from dotenv import load_dotenv
 import dateutil
+import dateutil.parser
 import pandas as pd
 import ratelimit
 
-from bs_kiteconnect import make_kiteconnect_api
+from libstonks.bs_kiteconnect import make_kiteconnect_api
+from libstonks.utils.bs_dateutil import get_last_thursdays_between_dates
 
 load_dotenv()
-logging.basicConfig(level=logging.DEBUG)
+
 BSSTONKS_DIRECTORY = os.getenv("BSSTONKS_DIRECTORY")
 KITE_INSTRUMENTS_DIRECTORY = os.path.join(BSSTONKS_DIRECTORY,"input","kite_instruments")
 KITE_HISTORICAL_DIRECTORY = os.path.join(BSSTONKS_DIRECTORY,"input","kite_historical")
@@ -26,6 +29,7 @@ INSTRUMENT_KEY_TRADINGSYMBOL = "tradingsymbol"
 INSTRUMENT_KEY_INSTRUMENT_TYPE = "instrument_type"
 INSTRUMENT_KEY_EXCHANGE = "exchange"
 INSTRUMENT_KEY_SEGMENT = "segment"
+INSTRUMENT_KEY_EXPIRTY = "expiry"
 INSTRUMENT_TYPE_EQ = "EQ"
 INSTRUMENT_TYPE_PE = "PE"
 INSTRUMENT_TYPE_PE = "FUT"
@@ -55,12 +59,26 @@ def kite_instrument_to_filename(instrument_dict, interval="day", option_expiry=O
         trading_symbol = trading_symbol.replace(name,"")
         trading_symbol = trading_symbol[5:]
         trading_symbol = name + trading_symbol
+        # figure out option expirty automatically, (while sync we let it automatic)
+        # while reading the data we pass this param premade to indicate we're looking for
+        # specific series
+        if option_expiry is None:
+            
+            series_expirty_datetime = dateutil.parser.parse(instrument_dict[INSTRUMENT_KEY_EXPIRTY])
+            today_datetime = datetime.now()
+            last_thursdays = get_last_thursdays_between_dates(today_datetime, series_expirty_datetime)
+            option_expiry = OPTION_EXPIRTY_1MONTH.replace("1", str(len(last_thursdays)))
+            
+        print("orig trading symbol:", instrument_dict[INSTRUMENT_KEY_TRADINGSYMBOL])
+        print("orig series expiry:", instrument_dict[INSTRUMENT_KEY_EXPIRTY])
         print("OPT SYMB:",trading_symbol)
         print("OPT EXP:",option_expiry)
         trading_symbol += option_expiry
     # we've tested that _ is valid seperator by evaluating for all the instruments (86k)
     result_file = f"{kite_instrument_token}_{trading_symbol}_{instrument_type}_{segment}_{exchange}_{interval}.csv"
     return result_file
+
+
 
 def sync_instrument_list():
     kite = make_kiteconnect_api()
@@ -104,18 +122,17 @@ def search_instruments_from_df(instruments_df, search_result_as_copy=True, instr
         thedf = thedf[thedf['name'].isin(name_eq)]
 
     if search_result_as_copy:
-        return thedf.copy().reset_index()
+        return thedf.copy().reset_index(drop=True)
     else:
         return thedf
 
 _cache_get_instrument_list_df = None
 def get_instrument_list(instrument_type=None, exchange=None, segment=None, force_refresh=False, symbols_contained=None, name_contained=None, symbol_eq=None, name_eq=None):
-    
     if force_refresh:
         sync_instrument_list()
 
     global _cache_get_instrument_list_df
-    if _cache_get_instrument_list_df is None:
+    if _cache_get_instrument_list_df is None or force_refresh:
         _cache_get_instrument_list_df = pd.read_csv(os.path.join(KITE_INSTRUMENTS_DIRECTORY,"instrument_list.csv"))
     thedf = _cache_get_instrument_list_df
 
@@ -130,7 +147,7 @@ def get_instrument_by_symbol(symbol):
 def throttled_historical_data_api(instrument_token, start_datetime, end_datetime, data_interval, oi=True, continuous=False):
     return make_kiteconnect_api().historical_data(instrument_token, start_datetime.strftime("%Y-%m-%d"), end_datetime.strftime("%Y-%m-%d"), data_interval, oi=oi, continuous=continuous)
 
-def sync_instrument_history(instrument_dict, data_interval="day", fetch_past=True, option_expiry=None):
+def sync_instrument_history(instrument_dict, data_interval="day", fetch_past=True):
     interval_data_span_limit = {
         'day': 2000,
         '60minute':400,
@@ -141,9 +158,19 @@ def sync_instrument_history(instrument_dict, data_interval="day", fetch_past=Tru
         'minute':60,
     }
     interval_span_days = interval_data_span_limit[data_interval]
-    
+
+    # the continuous param makes api return historical data from same strike and span of expiry
+    need_continuous_series = False
+    option_expiry = None
+    if instrument_dict[INSTRUMENT_KEY_EXCHANGE] == "NFO" and \
+        (instrument_dict[INSTRUMENT_KEY_INSTRUMENT_TYPE] == "CE" or instrument_dict[INSTRUMENT_KEY_INSTRUMENT_TYPE] == "PE"):
+        if data_interval == 'day':
+            need_continuous_series = True
+
     result_file = kite_instrument_to_filename(instrument_dict, interval=data_interval, option_expiry=option_expiry)
     result_file_path = os.path.join(KITE_HISTORICAL_DIRECTORY,result_file)
+    
+
     df_to_sync = None
     if not os.path.exists(result_file_path):
         df_to_sync = pd.DataFrame([],columns=["date","open","high","low","close","volume","oi"])
@@ -167,7 +194,7 @@ def sync_instrument_history(instrument_dict, data_interval="day", fetch_past=Tru
             #dates are inclusive so start date (historical date) needs to be adjusted
             start = end - timedelta(days=interval_span_days-1)
 
-        historical_data = throttled_historical_data_api(instrument_dict['instrument_token'], start, end, data_interval, oi=True)
+        historical_data = throttled_historical_data_api(instrument_dict['instrument_token'], start, end, data_interval, oi=True, continuous=need_continuous_series)
         for x in historical_data:
             x['date'] = str(x['date'])
 
@@ -198,7 +225,7 @@ def sync_instrument_history(instrument_dict, data_interval="day", fetch_past=Tru
             start = start - timedelta(days=1)
             #dates are inclusive so start date (historical date) needs to be adjusted
             end = start + timedelta(days=interval_span_days-1)
-            historical_data = throttled_historical_data_api(instrument_dict['instrument_token'], start, end, data_interval, oi=True)
+            historical_data = throttled_historical_data_api(instrument_dict['instrument_token'], start, end, data_interval, oi=True, continuous=need_continuous_series)
 
         
         for x in historical_data:
@@ -222,7 +249,6 @@ def sync_instrument_history(instrument_dict, data_interval="day", fetch_past=Tru
             break
 
 def get_instrument_history(instrument_dict, data_interval="day", option_expiry=None, force_refresh=False):
-    print("Opt exp in histfunc:", option_expiry)
     if force_refresh:
         sync_instrument_history(instrument_dict, data_interval="day", fetch_past=False, option_expiry=option_expiry)
     result_file = kite_instrument_to_filename(instrument_dict, interval=data_interval, option_expiry=option_expiry)
@@ -243,13 +269,14 @@ if __name__ == "__main__":
         # print(idx)
         # instrument = all_instruments.iloc[idx]
         dfoptions = search_instruments_from_df(all_instruments_options, name_eq=instrument[INSTRUMENT_KEY_TRADINGSYMBOL])
-        if dfoptions.shape[0]>0:
-            print(instrument[INSTRUMENT_KEY_TRADINGSYMBOL], dfoptions.shape)
-            # sync_instrument_history(dfoptions.iloc[0])
-            # theoptioninstrumentdf = get_instrument_history(dfoptions.iloc[0], option_expiry=OPTION_EXPIRTY_1MONTH)
-            # print(dfoptions.iloc[0])
-            # print(theoptioninstrumentdf)
-            # input()
+        for optidx, optrow in dfoptions.iterrows():
+            print(optrow[INSTRUMENT_KEY_TRADINGSYMBOL])
+            sync_instrument_history(optrow)
+            theoptioninstrumentdf = get_instrument_history(optrow, option_expiry=OPTION_EXPIRTY_1MONTH)
+            # print(optrow)
+            print(theoptioninstrumentdf)
+            break
+        break
     # nifty_50_instrument = all_instruments[all_instruments['tradingsymbol']=="NIFTY 50"].iloc[0]
     
     # # sync example:
