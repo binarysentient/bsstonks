@@ -37,7 +37,7 @@ if __name__ == "__main__":
         for idx, instrument in all_instruments_nse_eq.iterrows():
             if get_instrument_history(instrument) is None or len(get_instrument_history(instrument)) < 10:
                 continue
-            dfoptions_for_current_instrument = search_instruments_from_df(all_instruments_options, name_eq=instrument[INSTRUMENT_KEY_TRADINGSYMBOL])
+            dfoptions_for_current_instrument = search_options_for_instrument_in_df(all_instruments_options, instrument)
             for optidx, optrow in dfoptions_for_current_instrument.iterrows():
                 print(f"{optrow[INSTRUMENT_KEY_TRADINGSYMBOL]} - day")
                 sync_instrument_history(optrow, data_interval="day")

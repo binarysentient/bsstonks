@@ -75,7 +75,10 @@ def kite_instrument_to_filename(instrument_dict, interval="day", option_expiry=O
         print("OPT EXP:",option_expiry)
         trading_symbol += option_expiry
     # we've tested that _ is valid seperator by evaluating for all the instruments (86k)
-    result_file = f"{kite_instrument_token}_{trading_symbol}_{instrument_type}_{segment}_{exchange}_{interval}.csv"
+    #NOTE: we removed instrument token from here as it'll cause problems with options
+    #      options isntrumenttoken changes but the underlying continuous symbols would repeat
+    #      and we want to see options as continuous to make most analysis
+    result_file = f"{trading_symbol}_{instrument_type}_{segment}_{exchange}_{interval}.csv"
     return result_file
 
 
@@ -94,7 +97,7 @@ instrument_type: ['CE' 'PE' 'FUT' 'EQ']
 exchange: ['BCD' 'BSE' 'MCX' 'NSE' 'CDS' 'NFO']
 NFO exchange instrument types: ['CE' 'PE' 'FUT']
 '''
-def search_instruments_from_df(instruments_df, search_result_as_copy=True, instrument_type=None, exchange=None, segment=None, force_refresh=False, symbols_contained=None, name_contained=None, symbol_eq=None, name_eq=None):
+def search_instruments_in_df(instruments_df, search_result_as_copy=True, instrument_type=None, exchange=None, segment=None, force_refresh=False, symbols_contained=None, name_contained=None, symbol_eq=None, name_eq=None):
     thedf = instruments_df
     if instrument_type is not None:
         if type(instrument_type) == str:
@@ -136,7 +139,13 @@ def get_instrument_list(instrument_type=None, exchange=None, segment=None, force
         _cache_get_instrument_list_df = pd.read_csv(os.path.join(KITE_INSTRUMENTS_DIRECTORY,"instrument_list.csv"))
     thedf = _cache_get_instrument_list_df
 
-    return search_instruments_from_df(thedf, search_result_as_copy=True, instrument_type=instrument_type, exchange=exchange, segment=segment, force_refresh=force_refresh, symbols_contained=symbols_contained, name_contained=name_contained, symbol_eq=symbol_eq, name_eq=name_eq) 
+    return search_instruments_in_df(thedf, search_result_as_copy=True, instrument_type=instrument_type, exchange=exchange, segment=segment, force_refresh=force_refresh, symbols_contained=symbols_contained, name_contained=name_contained, symbol_eq=symbol_eq, name_eq=name_eq) 
+
+def search_options_for_instrument_in_df(thedf, instrument):
+    return search_instruments_in_df(thedf, name_eq=instrument[INSTRUMENT_KEY_TRADINGSYMBOL], segment=INSTRUMENT_SEGMENT_NFO_OPT)
+
+def get_options_for_instrument(instrument):
+    return search_options_for_instrument_in_df(get_instrument_list(), instrument)
 
 def get_instrument_by_symbol(symbol):
     return 
@@ -252,6 +261,7 @@ def get_instrument_history(instrument_dict, data_interval="day", option_expiry=N
     if force_refresh:
         sync_instrument_history(instrument_dict, data_interval="day", fetch_past=False, option_expiry=option_expiry)
     result_file = kite_instrument_to_filename(instrument_dict, interval=data_interval, option_expiry=option_expiry)
+    print("RESULTFILEE:", result_file)
     result_file_path = os.path.join(KITE_HISTORICAL_DIRECTORY,result_file)
     df_to_sync = None
     if os.path.exists(result_file_path):
@@ -268,7 +278,7 @@ if __name__ == "__main__":
     for idx, instrument in all_instruments.iterrows():
         # print(idx)
         # instrument = all_instruments.iloc[idx]
-        dfoptions = search_instruments_from_df(all_instruments_options, name_eq=instrument[INSTRUMENT_KEY_TRADINGSYMBOL])
+        dfoptions = search_instruments_in_df(all_instruments_options, name_eq=instrument[INSTRUMENT_KEY_TRADINGSYMBOL])
         for optidx, optrow in dfoptions.iterrows():
             print(optrow[INSTRUMENT_KEY_TRADINGSYMBOL])
             sync_instrument_history(optrow)
