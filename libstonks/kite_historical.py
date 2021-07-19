@@ -257,15 +257,18 @@ def sync_instrument_history(instrument_dict, data_interval="day", fetch_past=Tru
         if len(historical_data) < 3 or dateutil.parser.parse(historical_data[-1]['date']) - dateutil.parser.parse(historical_data[0]['date']) < timedelta(days=int(interval_span_days*0.5 - 15)):
             break
 
-def get_instrument_history(instrument_dict, data_interval="day", option_expiry=None, force_refresh=False):
+def get_instrument_history(instrument_dict, data_interval="day", option_expiry=None, force_refresh=False, parse_date=True):
     if force_refresh:
         sync_instrument_history(instrument_dict, data_interval="day", fetch_past=False, option_expiry=option_expiry)
     result_file = kite_instrument_to_filename(instrument_dict, interval=data_interval, option_expiry=option_expiry)
-    print("RESULTFILEE:", result_file)
     result_file_path = os.path.join(KITE_HISTORICAL_DIRECTORY,result_file)
     df_to_sync = None
     if os.path.exists(result_file_path):
-        df_to_sync = pd.read_csv(result_file_path,index_col=False)
+        if parse_date:
+            df_to_sync = pd.read_csv(result_file_path)
+            df_to_sync['date'] = df_to_sync['date'].apply(lambda x: dateutil.parser.parse(x))
+        else:
+            df_to_sync = pd.read_csv(result_file_path)
     return df_to_sync
 
 if __name__ == "__main__":

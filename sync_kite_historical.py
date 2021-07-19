@@ -10,9 +10,9 @@ from libstonks.utils.bs_threading import bs_multiprocessify, bs_threadify
 
 
     
-TO_SYNC_NSE_DAILY=False
+TO_SYNC_NSE_DAILY=True
 TO_SYNC_NSE_15MINUTE=False
-TO_SYNC_OPTIONS_DAILY=True
+TO_SYNC_OPTIONS_DAILY=False
 # TODO: minute level (15min for example) data has date exceeding 3:15pm for the day it is fetched after 3:15 
 #       fix taht
 if __name__ == "__main__":
@@ -25,12 +25,14 @@ if __name__ == "__main__":
     if TO_SYNC_NSE_DAILY:
         for _, row_nse_eq in all_instruments_nse_eq.iterrows():
             print(f"{row_nse_eq[INSTRUMENT_KEY_TRADINGSYMBOL]} - day")
-            sync_instrument_history(row_nse_eq, data_interval="day")
+            sync_instrument_history(row_nse_eq, data_interval="day", fetch_past=False)
 
     if TO_SYNC_NSE_15MINUTE:
         for _, row_nse_eq in all_instruments_nse_eq.iterrows():
             print(f"{row_nse_eq[INSTRUMENT_KEY_TRADINGSYMBOL]} - 15minute")
-            sync_instrument_history(row_nse_eq, data_interval="15minute")
+            # only fetch when there's daily data available
+            if len(get_instrument_history(row_nse_eq, parse_date=False)) > 0:
+                sync_instrument_history(row_nse_eq, data_interval="15minute")
 
     if TO_SYNC_OPTIONS_DAILY:
         all_instruments_options = get_instrument_list(segment=INSTRUMENT_SEGMENT_NFO_OPT)

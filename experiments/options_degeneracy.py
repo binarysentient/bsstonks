@@ -22,7 +22,6 @@ for idx, instrument in instruments_to_focus.iterrows():
     print(instrument[kite_historical.INSTRUMENT_KEY_TRADINGSYMBOL])
     print("---------------------")
     instrument_history = kite_historical.get_instrument_history(instrument)
-    instrument_history["date"] = instrument_history["date"].apply(lambda x: dateutil.parser.parse(x))
     
     fig, ax1 = plt.subplots()
 
@@ -40,7 +39,6 @@ for idx, instrument in instruments_to_focus.iterrows():
             
             if option_strike > 510 and option_strike < 550:
                 instrument_history = kite_historical.get_instrument_history(option_instrument,option_expiry=kite_historical.OPTION_EXPIRTY_1MONTH)
-                instrument_history["date"] = instrument_history["date"].apply(lambda x: dateutil.parser.parse(x))
                 ax2.plot(instrument_history["date"], instrument_history["close"], label=f"{option_strike} {option_instrument_type}")
     plt.legend()
     plt.show()
