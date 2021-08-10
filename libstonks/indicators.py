@@ -8,6 +8,7 @@ class INDICATORS:
     MOVING_AVERAGE = "ma"
     RELATIVE_STRENGTH_INDEX = "rsi"
     EXPONENTIAL_MOVING_AVERAGE = "ema"
+    SMOOTHED_MOVING_AVERAGE = "sma"
     HISTORICAL_VOLATILITY = "hv"
     
     @staticmethod
@@ -54,6 +55,20 @@ class INDICATORS:
         indicator_params_dict['unique_selector'] = f"{INDICATORS.MOVING_AVERAGE}_{indicator_params_dict['length']}_{indicator_params_dict['source']}"
         return indicator_params_dict
     
+    @staticmethod
+    def get_smoothed_moving_average_indicator(df, length=5, source='close'):
+        return df[source].ewm(span=length, adjust=False).mean()
+    
+    @staticmethod
+    def get_smoothed_moving_average_params(indicator_params_dict):
+        if indicator_params_dict == None:
+            indicator_params_dict = {}
+        if 'length' not in indicator_params_dict:
+            indicator_params_dict['length'] = 5
+        if 'source' not in indicator_params_dict:
+            indicator_params_dict['source'] = 'close'
+        indicator_params_dict['unique_selector'] = f"{INDICATORS.MOVING_AVERAGE}_{indicator_params_dict['length']}_{indicator_params_dict['source']}"
+        return indicator_params_dict
         
     @staticmethod
     def get_rsi_indicator(df, length=5, source='close', mean_function='ema'):
@@ -131,6 +146,16 @@ class INDICATORS:
                 column_selector = the_params_dict['unique_selector']
                 if column_selector not in df.columns:
                     df[column_selector] = INDICATORS.get_exponential_moving_average_indicator(df, length=the_params_dict['length'], source=the_params_dict['source'])
+                                
+                return df[column_selector]
+
+            # SMA
+            if indicator_name == INDICATORS.SMOOTHED_MOVING_AVERAGE:    
+                the_params_dict = INDICATORS.get_smoothed_moving_average_params(indicator_params_dict)
+                
+                column_selector = the_params_dict['unique_selector']
+                if column_selector not in df.columns:
+                    df[column_selector] = INDICATORS.get_smoothed_moving_average_indicator(df, length=the_params_dict['length'], source=the_params_dict['source'])
                                 
                 return df[column_selector]
             

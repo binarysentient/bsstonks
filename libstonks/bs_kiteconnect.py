@@ -89,7 +89,7 @@ def _kiteconnect_login_and_fetch_request_token():
         pin_input_selector = "input#pin"
         pin_continue_button_selector = ".actions button"
 
-        browser = await launch({'headless': False})
+        browser = await launch({'headless': False, 'handleSIGINT':False, 'handleSIGTERM':False, 'handleSIGHUP':False})
         page = await browser.newPage()
         page.setDefaultNavigationTimeout(3*1000)
         # go to the login url
@@ -160,7 +160,7 @@ class KiteTokenReceiverServerThread(Thread):
 
 
 
-def make_kiteconnect_api():
+def make_kiteconnect_api() -> KiteConnect:
     tokenmap = _read_kite_access_token()
     kite = KiteConnect(api_key=KITE_CONNECT_API_KEY)
     if tokenmap is None:

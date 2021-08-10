@@ -28,6 +28,7 @@ NFO exchange instrument types: ['CE' 'PE' 'FUT']
 INSTRUMENT_KEY_TRADINGSYMBOL = "tradingsymbol"
 INSTRUMENT_KEY_INSTRUMENT_TYPE = "instrument_type"
 INSTRUMENT_KEY_EXCHANGE = "exchange"
+INSTRUMENT_KEY_INSTRUMENT_TOKEN = "instrument_token"
 INSTRUMENT_KEY_SEGMENT = "segment"
 INSTRUMENT_KEY_EXPIRTY = "expiry"
 INSTRUMENT_TYPE_EQ = "EQ"
@@ -45,6 +46,14 @@ INSTRUMENT_SEGMENT_NFO_OPT = "NFO-OPT"
 OPTION_EXPIRTY_1MONTH="exp1month"
 OPTION_EXPIRTY_2MONTH="exp2month"
 OPTION_EXPIRTY_3MONTH="exp3month"
+
+DATA_INTERVAL_DAY = 'day'
+DATA_INTERVAL_60MINUTE = '60minute'
+DATA_INTERVAL_30MINUTE = '30minute'
+DATA_INTERVAL_15MINUTE = '15minute'
+DATA_INTERVAL_5MINTUTE = '5minute'
+DATA_INTERVAL_3MINUTE = '3minute'
+DATA_INTERVAL_MINUTE = 'minute'
 
 def kite_instrument_to_filename(instrument_dict, interval="day", option_expiry=OPTION_EXPIRTY_1MONTH):
     kite_instrument_token = instrument_dict['instrument_token']
@@ -97,7 +106,7 @@ instrument_type: ['CE' 'PE' 'FUT' 'EQ']
 exchange: ['BCD' 'BSE' 'MCX' 'NSE' 'CDS' 'NFO']
 NFO exchange instrument types: ['CE' 'PE' 'FUT']
 '''
-def search_instruments_in_df(instruments_df, search_result_as_copy=True, instrument_type=None, exchange=None, segment=None, force_refresh=False, symbols_contained=None, name_contained=None, symbol_eq=None, name_eq=None):
+def search_instruments_in_df(instruments_df, search_result_as_copy=True, instrument_type=None, exchange=None, segment=None, force_refresh=False, symbol_contained=None, name_contained=None, symbol_eq=None, name_eq=None):
     thedf = instruments_df
     if instrument_type is not None:
         if type(instrument_type) == str:
@@ -130,7 +139,9 @@ def search_instruments_in_df(instruments_df, search_result_as_copy=True, instrum
         return thedf
 
 _cache_get_instrument_list_df = None
-def get_instrument_list(instrument_type=None, exchange=None, segment=None, force_refresh=False, symbols_contained=None, name_contained=None, symbol_eq=None, name_eq=None):
+def get_instrument_list(instrument_type=None, exchange=None, segment=None, force_refresh=False, symbol_contained=None, name_contained=None, symbol_eq=None, name_eq=None) -> pd.DataFrame:
+    """Returns the instruments dataframe based on criteria. If no parameters then returns all available instruments at zerodha
+    - `exchange`: NSE or BSE or NFO or more.. """
     if force_refresh:
         sync_instrument_list()
 
@@ -139,7 +150,7 @@ def get_instrument_list(instrument_type=None, exchange=None, segment=None, force
         _cache_get_instrument_list_df = pd.read_csv(os.path.join(KITE_INSTRUMENTS_DIRECTORY,"instrument_list.csv"))
     thedf = _cache_get_instrument_list_df
 
-    return search_instruments_in_df(thedf, search_result_as_copy=True, instrument_type=instrument_type, exchange=exchange, segment=segment, force_refresh=force_refresh, symbols_contained=symbols_contained, name_contained=name_contained, symbol_eq=symbol_eq, name_eq=name_eq) 
+    return search_instruments_in_df(thedf, search_result_as_copy=True, instrument_type=instrument_type, exchange=exchange, segment=segment, force_refresh=force_refresh, symbol_contained=symbol_contained, name_contained=name_contained, symbol_eq=symbol_eq, name_eq=name_eq) 
 
 def search_options_for_instrument_in_df(thedf, instrument):
     return search_instruments_in_df(thedf, name_eq=instrument[INSTRUMENT_KEY_TRADINGSYMBOL], segment=INSTRUMENT_SEGMENT_NFO_OPT)
@@ -257,18 +268,24 @@ def sync_instrument_history(instrument_dict, data_interval="day", fetch_past=Tru
         if len(historical_data) < 3 or dateutil.parser.parse(historical_data[-1]['date']) - dateutil.parser.parse(historical_data[0]['date']) < timedelta(days=int(interval_span_days*0.5 - 15)):
             break
 
-def get_instrument_history(instrument_dict, data_interval="day", option_expiry=None, force_refresh=False, parse_date=True):
+def get_instrument_history(instrument_dict, data_interval="day", option_expiry=None, force_refresh=False, parse_date=True, start_datetime:datetime=None, end_datetime:datetime=None):
     if force_refresh:
-        sync_instrument_history(instrument_dict, data_interval="day", fetch_past=False, option_expiry=option_expiry)
+        sync_instrument_history(instrument_dict, data_interval="day", fetch_past=False)
     result_file = kite_instrument_to_filename(instrument_dict, interval=data_interval, option_expiry=option_expiry)
     result_file_path = os.path.join(KITE_HISTORICAL_DIRECTORY,result_file)
     df_to_sync = None
     if os.path.exists(result_file_path):
-        if parse_date:
-            df_to_sync = pd.read_csv(result_file_path)
+        df_to_sync = pd.read_csv(result_file_path)
+        if start_datetime is not None:
+            df_to_sync = df_to_sync[df_to_sync['date'] >= str(start_datetime)].reset_index(drop=True)
+        if end_datetime is not None:
+            df_to_sync = df_to_sync[df_to_sync['date'] <= str(end_datetime)].reset_index(drop=True)
+        if parse_date:    
+            # TODO: faster date parsing, and
+            #       difference between using date parsing at read_csv level
             df_to_sync['date'] = df_to_sync['date'].apply(lambda x: dateutil.parser.parse(x))
-        else:
-            df_to_sync = pd.read_csv(result_file_path)
+        
+            
     return df_to_sync
 
 if __name__ == "__main__":
