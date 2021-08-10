@@ -1,3 +1,4 @@
+from libstonks.kite_historical import INSTRUMENT_KEY_TRADINGSYMBOL
 from typing import Optional
 from libstonks.bs_kiteconnect import make_kiteconnect_api
 from libstonks.indicators import INDICATORS
@@ -38,7 +39,10 @@ class RsiBullishBearishSignalAgent(BaseTradingSignalAgent):
 
     def get_signals(self) -> pd.Series:
         ohlc_df = self.data_orchestrator.get_ohlc_data_df()
-        ohlc_df.get
+        indicator_func = INDICATORS.create_get_indicator_func(ohlc_df)
+        rsi_series = indicator_func("rsi",{'length':5})
+        print(ohlc_df)
+        
 
 class BaseTradingStrategy():
     """A strategy is responsible for generating buy/sell signals"""
@@ -51,6 +55,7 @@ class BaseTradingStrategy():
     # instrument_data: expected price action data with 'date', ..ohlc.. , 'volume'
     def get_order_signals(self, instrument, instrument_data):
         pass
+
 
 
 def main_test():

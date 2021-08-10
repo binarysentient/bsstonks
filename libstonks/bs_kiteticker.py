@@ -91,8 +91,6 @@ class BSKiteTicker(Thread):
             return None
         
         base_df:DataFrame = self.instrument_tick_data_df[instrument_token]
-        print(base_df[['date','price']])
-        print(base_df[['date','price']].dtypes)
         
         volume_df:DataFrame = base_df[['date','volume']].set_index('date').resample(resample_map[interval]).apply(lambda x: x.iloc[-1] - x.iloc[0]).reset_index()
         ohlc_df:DataFrame = base_df[['date','price']].set_index('date').resample(resample_map[interval]).ohlc()
@@ -102,7 +100,7 @@ class BSKiteTicker(Thread):
         # print(ohlc_df)
         # print(volume_df)
         merged_df = pd.merge(volume_df, ohlc_df, on='date')
-        print(merged_df)
+        return merged_df
 
     def on_connect(self, ws, response):
         print(f"Connected:{response}")
