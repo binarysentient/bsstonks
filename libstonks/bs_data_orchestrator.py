@@ -5,19 +5,20 @@ import time
 import traceback
 from typing import Dict
 
-from libstonks.bs_kiteticker import BSKiteTicker
-from libstonks.kite_historical import DATA_INTERVAL_MINUTE, INSTRUMENT_KEY_INSTRUMENT_TOKEN, get_instrument_history
+from libstonks.bs_kiteticker import BSKiteTicker, DATA_INTERVAL_TICK
+from libstonks.kite_historical import DATA_INTERVAL_15MINUTE, DATA_INTERVAL_30MINUTE, DATA_INTERVAL_3MINUTE, DATA_INTERVAL_5MINUTE, DATA_INTERVAL_60MINUTE, DATA_INTERVAL_DAY, DATA_INTERVAL_MINUTE, INSTRUMENT_KEY_INSTRUMENT_TOKEN, get_instrument_history
 
 LOGGER = logging.getLogger("kite_historical")
 
 class BSDataOrchestrator():
 
-    def __init__(self, instrument, kite_ticker:BSKiteTicker=None, minimum_granule_interval=DATA_INTERVAL_MINUTE) -> None:
+    def __init__(self, instrument, kite_ticker:BSKiteTicker=None, minimum_granule_interval=DATA_INTERVAL_MINUTE, backtest_start_date:datetime=None) -> None:
         """The data orchestrator takes care of making the data available to the strategy runner
         - `minimum_granule_interval`: same as what `DATA_INTERVAL_` 
         - `instrument_dict`: is the instrument detail; one row from which `kite_historical.get_instrument_list(...)` returns.
         That row has all the symbol/exchange etc information
         - `kite_ticker`: is optional for backtest, but for live paper test and live real trades it's mandatory
+        - `backtest_start_date` : we start the iterations from here
         """
         self.instrument = instrument
         self.minimum_granule_interval = minimum_granule_interval
@@ -27,13 +28,19 @@ class BSDataOrchestrator():
         self.current_iteration_index = 0
         self.current_live_minimum_granule_df = None
         
+        self.backtest_start_date = backtest_start_date
+
         self.ohlc_df_buffer = {}
+        self.kite_ticker = None
         if kite_ticker:
             self.kite_ticker = kite_ticker
             self.kite_ticker.subscribe(instrument[INSTRUMENT_KEY_INSTRUMENT_TOKEN])
+
+        # get_instrument_history(self.instrument, data_interval=self.minimum_granule_interval, force_refresh=True, parse_date=False)
     
     def __iterate_for_backtest(self):
-        self.current_iteration_source = get_instrument_history(self.instrument, self.minimum_granule_interval)
+        self.current_iteration_source = get_instrument_history(self.instrument, self.minimum_granule_interval, start_datetime=self.backtest_start_date)
+        # self.current_iteration_source = self.current_iteration_source[self.current_iteration_source['date'] > self.backtest_start_date]
         self.current_iteration_index = -1
         
     
@@ -77,6 +84,28 @@ class BSDataOrchestrator():
                 return return_val
         
 
+    def get_latest_granule_date_and_price(self) -> tuple:
+        """use this function to get the latest factual price data
+        - this is useful because say minimum granule is 1 min and we trade analytics at 15 min then
+        the historical backtest data for 15 min will have future info for that timespan (15 min candle is left assembled)
+        """
+        latest_df = self.get_ohlc_data_df(data_interval=self.minimum_granule_interval)
+        latest_row = latest_df.iloc[-1]
+        return (latest_row['date'], latest_row['close'])
+
+    def interval_to_seconds(self, data_interval=None):
+        if data_interval:
+            return {
+                DATA_INTERVAL_TICK: 1,
+                DATA_INTERVAL_MINUTE: 1*60,
+                DATA_INTERVAL_3MINUTE: 3*60,
+                DATA_INTERVAL_5MINUTE: 5*60,
+                DATA_INTERVAL_15MINUTE: 15*60,
+                DATA_INTERVAL_30MINUTE: 30*60,
+                DATA_INTERVAL_60MINUTE: 60*60,
+                DATA_INTERVAL_DAY: 24*60*60
+            }[data_interval]
+
     def get_ohlc_data_df(self, data_interval=None) -> None:  
         current_data_interval = self.minimum_granule_interval
         if data_interval is not None:
@@ -94,13 +123,22 @@ class BSDataOrchestrator():
 
         thedf = self.ohlc_df_buffer[str(lookup_tuple)][0]
 
-        if self.current_iteration_source:
+        if self.current_iteration_source is not None:
+            
             startdate = self.current_iteration_source.iloc[0]['date']
             enddate = self.current_iteration_source.iloc[self.current_iteration_index]['date']
             
             thedf = thedf[thedf['date'] >= startdate]
             thedf = thedf[thedf['date'] <= enddate]
 
+            # for the runtime scenario, when minimum granule is 1 minute and we do strategy on a 15 min, then 15 min has future knowlege
+            # as ohlc candles are left labeled
+            if self.interval_to_seconds(self.minimum_granule_interval) < self.interval_to_seconds(current_data_interval):
+                thedf = thedf.set_index('date')
+                livemimicdf = self.current_iteration_source.iloc[:self.current_iteration_index+1]
+                livemimicdf = livemimicdf.set_index('date').resample(BSKiteTicker.get_resample_map()[current_data_interval]).agg({'open':'first','high':'max','low':'min', 'close':'last'}).reset_index()
+                thedf.loc[livemimicdf.iloc[-1]['date']] = livemimicdf.iloc[-1]
+                thedf = thedf.reset_index()
 
         if self.kite_ticker is not None:
             new_data_df = self.kite_ticker.get_instrument_data(self.instrument[INSTRUMENT_KEY_INSTRUMENT_TOKEN], current_data_interval)

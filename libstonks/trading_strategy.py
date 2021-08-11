@@ -1,4 +1,6 @@
-from libstonks.kite_historical import INSTRUMENT_KEY_TRADINGSYMBOL
+from kiteconnect.connect import KiteConnect
+from libstonks.paper_kite_account import PaperKiteAccount
+from libstonks.kite_historical import DATA_INTERVAL_15MINUTE, INSTRUMENT_KEY_EXCHANGE, INSTRUMENT_KEY_TRADINGSYMBOL
 from typing import Optional
 from libstonks.bs_kiteconnect import make_kiteconnect_api
 from libstonks.indicators import INDICATORS
@@ -41,22 +43,67 @@ class RsiBullishBearishSignalAgent(BaseTradingSignalAgent):
         ohlc_df = self.data_orchestrator.get_ohlc_data_df()
         indicator_func = INDICATORS.create_get_indicator_func(ohlc_df)
         rsi_series = indicator_func("rsi",{'length':5})
-        print(ohlc_df)
+        print(ohlc_df.tail(1))
         
 
 class BaseTradingStrategy():
     """A strategy is responsible for generating buy/sell signals"""
-    def __init__(self) -> None:
+    def __init__(self, data_orchestrator:BSDataOrchestrator, zeordha_like_trading_account:PaperKiteAccount) -> None:
         """we might want to initialize multiple signal agents, or custom ML classes or some external libs etc.."""    
-        pass
+        """some hyper parameters could be added here; say for rsi strategy we want to customize the thresholds
+        - `data_orchestrator` makes available live + historical data, the signature is same that of `kite_historical.get_instrument_history(...)`"""
+        self.data_orchestrator = data_orchestrator
+        self.trading_account = zeordha_like_trading_account
 
+    def place_order(self, quantity=1, transaction_type=None):
+        """place an order
+        - `transaction_type`: BUY|SELL, KiteConnect.TRANSACTION_TYPE_BUY
+        """
+        buydate, price = self.data_orchestrator.get_latest_granule_date_and_price()
+        self.trading_account.place_order(KiteConnect.VARIETY_REGULAR, 
+                self.data_orchestrator.instrument[INSTRUMENT_KEY_EXCHANGE],
+                self.data_orchestrator.instrument[INSTRUMENT_KEY_TRADINGSYMBOL],
+                transaction_type,
+                quantity,
+                KiteConnect.PRODUCT_NRML,
+                KiteConnect.ORDER_TYPE_MARKET,
+                price=price,
+                tag=f"timestamp_{buydate.timestamp()}")
+    
     # instrument: the instrument row/instrument information
     #             expected 'tradingsymbol' key
     # instrument_data: expected price action data with 'date', ..ohlc.. , 'volume'
-    def get_order_signals(self, instrument, instrument_data):
+    def execute_step(self):
+        """for given timestep execute the strategy based on the latest information the data_orchestrator gives"""
+        
         pass
 
 
+class RsiMidTennisTradingStrategy(BaseTradingStrategy):
+
+    def __init__(self, data_orchestrator: BSDataOrchestrator, zeordha_like_trading_account: PaperKiteAccount) -> None:
+        super().__init__(data_orchestrator, zeordha_like_trading_account)
+    
+    def execute_step(self):
+        """the data orchestrator ensures that we never can cheat to look future data in backtest.
+        And the super() place order ensures that we use proper instrument that dataorchestrator is based off of and 
+        that we use perfect latest available price
+        """
+        datadf = self.data_orchestrator.get_ohlc_data_df(data_interval=DATA_INTERVAL_15MINUTE)
+        get_indicator = INDICATORS.create_get_indicator_func(datadf)
+        rsi15 = get_indicator('rsi', {'length':15})
+        # NOTE: never do try: catch: here, ideally we want to take care of all the possible scenarios preemptively
+        if len(rsi15) <= 1:
+            return
+        
+        last_trade_transaction_type = None
+        recent_trades = self.trading_account.get_trades()
+        if len(recent_trades) > 0:
+            last_trade_transaction_type = recent_trades[-1]['transaction_type']
+        if rsi15.iloc[-2] < 45.0 and rsi15.iloc[-1] >= 45.0 and last_trade_transaction_type != KiteConnect.TRANSACTION_TYPE_BUY:
+            self.place_order(quantity=50, transaction_type=KiteConnect.TRANSACTION_TYPE_BUY)
+        elif rsi15.iloc[-2] > 45.0 and rsi15.iloc[-1] <= 45.0 and last_trade_transaction_type != KiteConnect.TRANSACTION_TYPE_SELL:
+            self.place_order(quantity=50, transaction_type=KiteConnect.TRANSACTION_TYPE_SELL)
 
 def main_test():
     kite = make_kiteconnect_api()

@@ -74,9 +74,9 @@ class BSKiteTicker(Thread):
             # print(self.instrument_tick_data_df[tick_token])
             # print(self.instrument_tick_data_df[tick_token].dtypes)
         # for tick in ticks:
-
-    def get_instrument_data(self, instrument_token, interval=DATA_INTERVAL_MINUTE):
-        resample_map = {
+    @staticmethod
+    def get_resample_map():
+        return {
             DATA_INTERVAL_TICK: '1S',
             DATA_INTERVAL_MINUTE: '1min',
             DATA_INTERVAL_3MINUTE: '3min',
@@ -86,6 +86,8 @@ class BSKiteTicker(Thread):
             DATA_INTERVAL_60MINUTE: '60min',
             DATA_INTERVAL_DAY: '1D'
         }
+    def get_instrument_data(self, instrument_token, interval=DATA_INTERVAL_MINUTE):
+        resample_map = BSKiteTicker.get_resample_map()
         if instrument_token not in self.instrument_tick_data_df:
             print(f"{instrument_token} not in {self.instrument_tick_data_df.keys()}")
             return None

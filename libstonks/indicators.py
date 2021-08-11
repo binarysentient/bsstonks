@@ -165,7 +165,7 @@ class INDICATORS:
                 
                 column_selector = the_params_dict['unique_selector']
                 if column_selector not in df.columns:
-                    df[column_selector] = INDICATORS.get_rsi_indicator(df, length=the_params_dict['length'], source=the_params_dict['source'], mean_function=indicator_params_dict['mean_function'])
+                    df[column_selector] = INDICATORS.get_rsi_indicator(df, length=the_params_dict['length'], source=the_params_dict['source'], mean_function=the_params_dict['mean_function'])
                                 
                 return df[column_selector]
             
