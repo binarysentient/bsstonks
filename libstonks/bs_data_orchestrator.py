@@ -21,45 +21,67 @@ class BSDataOrchestrator():
         """
         self.instrument = instrument
         self.minimum_granule_interval = minimum_granule_interval
+
+        # iteration related attributes
         self.current_iteration_source = None
         self.current_iteration_index = 0
+        self.current_live_minimum_granule_df = None
+        
         self.ohlc_df_buffer = {}
         if kite_ticker:
             self.kite_ticker = kite_ticker
             self.kite_ticker.subscribe(instrument[INSTRUMENT_KEY_INSTRUMENT_TOKEN])
     
-    def iterator_state_(self):
-        print("CALLING ITER")
-        return self.__iter__()
-
-    def __iter__(self):
+    def __iterate_for_backtest(self):
         self.current_iteration_source = get_instrument_history(self.instrument, self.minimum_granule_interval)
         self.current_iteration_index = -1
-        return self
+        
+    
+    def __iterate_cleanup_backtest(self):
+        self.current_iteration_source = None
+        self.current_iteration_index = 0
+    
+    def __iterate_for_live(self):
+        self.current_live_minimum_granule_df =  self.kite_ticker.get_instrument_data(self.instrument[INSTRUMENT_KEY_INSTRUMENT_TOKEN], self.minimum_granule_interval)
+        
+
+    def __iter__(self):
+        if self.kite_ticker is not None:
+            self.__iterate_for_live()
+            return self
+        else:
+            self.__iterate_for_backtest()
+            return self
+        
 
     def __next__(self):
-        self.current_iteration_index += 1
-        if len(self.current_iteration_source) <= self.current_iteration_index:
-            raise StopIteration
+        if self.kite_ticker is not None:
+            # live iterations
+            while True:
+                new_live_df =  self.kite_ticker.get_instrument_data(self.instrument[INSTRUMENT_KEY_INSTRUMENT_TOKEN], self.minimum_granule_interval)
+                if self.current_live_minimum_granule_df  is None:
+                    self.current_live_minimum_granule_df  = new_live_df
+                if new_live_df is not None and len(new_live_df) > len(self.current_live_minimum_granule_df) and len(new_live_df) > 1:
+                    self.current_live_minimum_granule_df = new_live_df
+                    return self.current_live_minimum_granule_df
+                time.sleep(1)
+            # TODO: raise stopiteration when time exceed today's 3:30
         else:
-            return_val = self.current_iteration_source.iloc[self.current_iteration_index]['date']
-            return return_val
+            # backtest iterations
+            self.current_iteration_index += 1
+            if len(self.current_iteration_source) <= self.current_iteration_index:
+                self.__iterate_cleanup_backtest()
+                raise StopIteration
+            else:
+                return_val = self.current_iteration_source.iloc[self.current_iteration_index]['date']
+                return return_val
         
 
-    def get_ohlc_data_df(self, data_interval=None) -> None:
-        
-        if data_interval == self.minimum_granule_interval:
-            # TODO: get hostorical as well to combine
-            if self.kite_ticker is not None:
-                return self.kite_ticker.get_instrument_data(self.instrument[INSTRUMENT_KEY_INSTRUMENT_TOKEN], self.minimum_granule_interval)
-        
+    def get_ohlc_data_df(self, data_interval=None) -> None:  
         current_data_interval = self.minimum_granule_interval
         if data_interval is not None:
             current_data_interval = data_interval
-        
-        startdate = self.current_iteration_source.iloc[0]['date']
-        enddate = self.current_iteration_source.iloc[self.current_iteration_index]['date']
-        
+            
         old_file_chronological_identity = "OldFileIdentity"
         lookup_tuple = (self.instrument, current_data_interval)
         if str(lookup_tuple) in self.ohlc_df_buffer:
@@ -71,8 +93,18 @@ class BSDataOrchestrator():
             self.ohlc_df_buffer[str(lookup_tuple)] = (new_data_df, new_file_chronological_identity)
 
         thedf = self.ohlc_df_buffer[str(lookup_tuple)][0]
-        thedf = thedf[thedf['date'] >= startdate]
-        thedf = thedf[thedf['date'] <= enddate]
+
+        if self.current_iteration_source:
+            startdate = self.current_iteration_source.iloc[0]['date']
+            enddate = self.current_iteration_source.iloc[self.current_iteration_index]['date']
+            
+            thedf = thedf[thedf['date'] >= startdate]
+            thedf = thedf[thedf['date'] <= enddate]
+
+
+        if self.kite_ticker is not None:
+            new_data_df = self.kite_ticker.get_instrument_data(self.instrument[INSTRUMENT_KEY_INSTRUMENT_TOKEN], current_data_interval)
+            thedf = thedf.append(new_data_df)
         
         return thedf.copy().reset_index(drop=True)
     

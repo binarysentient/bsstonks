@@ -9,7 +9,7 @@ from kiteconnect import KiteTicker
 from pandas.core.frame import DataFrame
 
 from libstonks.bs_kiteconnect import KITE_CONNECT_API_KEY, _read_kite_access_token, make_kiteconnect_api
-from libstonks.kite_historical import DATA_INTERVAL_15MINUTE, DATA_INTERVAL_30MINUTE, DATA_INTERVAL_3MINUTE, DATA_INTERVAL_5MINTUTE, DATA_INTERVAL_60MINUTE, DATA_INTERVAL_DAY, INSTRUMENT_KEY_INSTRUMENT_TOKEN, get_instrument_list, DATA_INTERVAL_MINUTE
+from libstonks.kite_historical import DATA_INTERVAL_15MINUTE, DATA_INTERVAL_30MINUTE, DATA_INTERVAL_3MINUTE, DATA_INTERVAL_5MINUTE, DATA_INTERVAL_60MINUTE, DATA_INTERVAL_DAY, INSTRUMENT_KEY_INSTRUMENT_TOKEN, get_instrument_list, DATA_INTERVAL_MINUTE
 
 DATA_INTERVAL_TICK = 'TICK'
 
@@ -80,7 +80,7 @@ class BSKiteTicker(Thread):
             DATA_INTERVAL_TICK: '1S',
             DATA_INTERVAL_MINUTE: '1min',
             DATA_INTERVAL_3MINUTE: '3min',
-            DATA_INTERVAL_5MINTUTE: '5min',
+            DATA_INTERVAL_5MINUTE: '5min',
             DATA_INTERVAL_15MINUTE: '15min',
             DATA_INTERVAL_30MINUTE: '30min',
             DATA_INTERVAL_60MINUTE: '60min',
