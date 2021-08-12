@@ -1,6 +1,7 @@
+from logging import ERROR
 from kiteconnect.connect import KiteConnect
 from libstonks.paper_kite_account import PaperKiteAccount
-from libstonks.kite_historical import DATA_INTERVAL_15MINUTE, INSTRUMENT_KEY_EXCHANGE, INSTRUMENT_KEY_TRADINGSYMBOL
+from libstonks.kite_historical import DATA_INTERVAL_15MINUTE, DATA_INTERVAL_MINUTE, INSTRUMENT_KEY_EXCHANGE, INSTRUMENT_KEY_TRADINGSYMBOL
 from typing import Optional
 from libstonks.bs_kiteconnect import make_kiteconnect_api
 from libstonks.indicators import INDICATORS
@@ -90,8 +91,8 @@ class RsiMidTennisTradingStrategy(BaseTradingStrategy):
         that we use perfect latest available price
         """
         datadf = self.data_orchestrator.get_ohlc_data_df(data_interval=DATA_INTERVAL_15MINUTE)
-        get_indicator = INDICATORS.create_get_indicator_func(datadf)
-        rsi15 = get_indicator('rsi', {'length':15})
+        rsi15 = INDICATORS.get_rsi_indicator(datadf['close'], length=15, mean_function="ema")
+
         # NOTE: never do try: catch: here, ideally we want to take care of all the possible scenarios preemptively
         if len(rsi15) <= 1:
             return
@@ -100,10 +101,47 @@ class RsiMidTennisTradingStrategy(BaseTradingStrategy):
         recent_trades = self.trading_account.get_trades()
         if len(recent_trades) > 0:
             last_trade_transaction_type = recent_trades[-1]['transaction_type']
+
         if rsi15.iloc[-2] < 45.0 and rsi15.iloc[-1] >= 45.0 and last_trade_transaction_type != KiteConnect.TRANSACTION_TYPE_BUY:
             self.place_order(quantity=50, transaction_type=KiteConnect.TRANSACTION_TYPE_BUY)
         elif rsi15.iloc[-2] > 45.0 and rsi15.iloc[-1] <= 45.0 and last_trade_transaction_type != KiteConnect.TRANSACTION_TYPE_SELL:
             self.place_order(quantity=50, transaction_type=KiteConnect.TRANSACTION_TYPE_SELL)
+
+
+class RsiDayEndNextOpenArbitrageTradingStrategy(BaseTradingStrategy):
+
+    def __init__(self, data_orchestrator: BSDataOrchestrator, zeordha_like_trading_account: PaperKiteAccount) -> None:
+        super().__init__(data_orchestrator, zeordha_like_trading_account)
+        if self.data_orchestrator.minimum_granule_interval != DATA_INTERVAL_MINUTE:
+            raise Exception("This trategy only works for Minute interval")
+    
+    def execute_step(self):
+        """the data orchestrator ensures that we never can cheat to look future data in backtest.
+        And the super() place order ensures that we use proper instrument that dataorchestrator is based off of and 
+        that we use perfect latest available price
+        """
+        # this returns minimum granule
+        
+        datadf = self.data_orchestrator.get_ohlc_data_df()
+        
+        current_datetime = datadf['date'].iloc[-1]
+        current_threshold = current_datetime.hour + current_datetime.minute/60
+        upper_sell_threshold = 9 + 35/60
+        lower_buy_threshold = 15 + 25/60
+        # print(current_datetime)
+        # print(current_threshold)
+        # print(upper_sell_threshold)
+        # print(lower_buy_threshold)
+        last_trade_transaction_type = None
+        recent_trades = self.trading_account.get_trades()
+        if len(recent_trades) > 0:
+            last_trade_transaction_type = recent_trades[-1]['transaction_type']
+        if current_threshold >= lower_buy_threshold  and last_trade_transaction_type != KiteConnect.TRANSACTION_TYPE_BUY:
+            self.place_order(quantity=50, transaction_type=KiteConnect.TRANSACTION_TYPE_BUY)
+        elif len(recent_trades) > 0 and current_threshold <= upper_sell_threshold <= 45.0 and last_trade_transaction_type != KiteConnect.TRANSACTION_TYPE_SELL:
+            # NOTE: len(recent_trades) > 0: this condition makes sure you don't sell if you don't own
+            self.place_order(quantity=50, transaction_type=KiteConnect.TRANSACTION_TYPE_SELL)
+
 
 def main_test():
     kite = make_kiteconnect_api()

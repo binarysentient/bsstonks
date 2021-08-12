@@ -6,7 +6,7 @@ import traceback
 from typing import Dict
 
 from libstonks.bs_kiteticker import BSKiteTicker, DATA_INTERVAL_TICK
-from libstonks.kite_historical import DATA_INTERVAL_15MINUTE, DATA_INTERVAL_30MINUTE, DATA_INTERVAL_3MINUTE, DATA_INTERVAL_5MINUTE, DATA_INTERVAL_60MINUTE, DATA_INTERVAL_DAY, DATA_INTERVAL_MINUTE, INSTRUMENT_KEY_INSTRUMENT_TOKEN, get_instrument_history
+from libstonks.kite_historical import DATA_INTERVAL_15MINUTE, DATA_INTERVAL_30MINUTE, DATA_INTERVAL_3MINUTE, DATA_INTERVAL_5MINUTE, DATA_INTERVAL_60MINUTE, DATA_INTERVAL_DAY, DATA_INTERVAL_MINUTE, INSTRUMENT_KEY_INSTRUMENT_TOKEN, get_instrument_history, get_instrument_history_chronological_identity
 
 LOGGER = logging.getLogger("kite_historical")
 
@@ -39,8 +39,8 @@ class BSDataOrchestrator():
         # get_instrument_history(self.instrument, data_interval=self.minimum_granule_interval, force_refresh=True, parse_date=False)
     
     def __iterate_for_backtest(self):
-        self.current_iteration_source = get_instrument_history(self.instrument, self.minimum_granule_interval, start_datetime=self.backtest_start_date)
-        # self.current_iteration_source = self.current_iteration_source[self.current_iteration_source['date'] > self.backtest_start_date]
+        self.current_iteration_source = self.get_buffered_instrument_history(self.minimum_granule_interval, start_datetime=self.backtest_start_date)
+        
         self.current_iteration_index = -1
         
     
@@ -80,7 +80,8 @@ class BSDataOrchestrator():
                 self.__iterate_cleanup_backtest()
                 raise StopIteration
             else:
-                return_val = self.current_iteration_source.iloc[self.current_iteration_index]['date']
+                return_val = self.current_iteration_source.loc[self.current_iteration_index]['date']
+                # return_val = "xx"
                 return return_val
         
 
@@ -106,43 +107,82 @@ class BSDataOrchestrator():
                 DATA_INTERVAL_DAY: 24*60*60
             }[data_interval]
 
-    def get_ohlc_data_df(self, data_interval=None) -> None:  
-        current_data_interval = self.minimum_granule_interval
-        if data_interval is not None:
-            current_data_interval = data_interval
-            
-        old_file_chronological_identity = "OldFileIdentity"
-        lookup_tuple = (self.instrument, current_data_interval)
+    def get_buffered_instrument_history(self, data_interval, start_datetime=None):
+        
+        old_file_chronological_identity = None
+        lookup_tuple = (self.instrument, data_interval, start_datetime)
         if str(lookup_tuple) in self.ohlc_df_buffer:
             old_file_chronological_identity = self.ohlc_df_buffer[str(lookup_tuple)][1]
         
+        if old_file_chronological_identity is None:
+            new_data_df = get_instrument_history(lookup_tuple[0], lookup_tuple[1], start_datetime=lookup_tuple[2])
+            new_file_chronological_identity = get_instrument_history_chronological_identity(lookup_tuple[0], lookup_tuple[1])
+            if new_file_chronological_identity is not None:
+                self.ohlc_df_buffer[str(lookup_tuple)] = (new_data_df, new_file_chronological_identity)
+        elif self.kite_ticker is not None:
+            # Presence of kite_ticker indicates this is realtime scenario and not a backtest
+            # NOTE: checking for file update makes sense for runtime, but for backtest it just slows things down due to lot of io calls
+            new_file_chronological_identity = get_instrument_history_chronological_identity(lookup_tuple[0], lookup_tuple[1])
+            if old_file_chronological_identity != new_file_chronological_identity:
+                new_data_df = get_instrument_history(lookup_tuple[0], lookup_tuple[1], start_datetime=lookup_tuple[2])
+                self.ohlc_df_buffer[str(lookup_tuple)] = (new_data_df, new_file_chronological_identity)
         
-        new_data_df, new_file_chronological_identity = get_instrument_history(lookup_tuple[0], lookup_tuple[1], file_chronological_identity=old_file_chronological_identity)
-        if new_file_chronological_identity is not None:
-            self.ohlc_df_buffer[str(lookup_tuple)] = (new_data_df, new_file_chronological_identity)
-
         thedf = self.ohlc_df_buffer[str(lookup_tuple)][0]
+        return thedf
 
+    def get_ohlc_data_df(self, data_interval=None, start_datetime=None) -> None:  
+        
+        current_data_interval = self.minimum_granule_interval
+        if data_interval is not None:
+            current_data_interval = data_interval
+        
+        if start_datetime is None and self.kite_ticker is None and self.backtest_start_date is not None:
+            start_datetime = self.backtest_start_date
+        
+        
+        
+        
         if self.current_iteration_source is not None:
-            
-            startdate = self.current_iteration_source.iloc[0]['date']
-            enddate = self.current_iteration_source.iloc[self.current_iteration_index]['date']
-            
-            thedf = thedf[thedf['date'] >= startdate]
-            thedf = thedf[thedf['date'] <= enddate]
-
+            # backtest scenario
+            if current_data_interval == self.minimum_granule_interval:
+                thedf = self.current_iteration_source.loc[:self.current_iteration_index+1]
+                #NOTE: the copy was there to serve INDICATOR system, where cascading indicators are possible
+                #      this copy would slow things down a lot;so Indicators now will have to change and behave as helper function
+                #      rather than full fledged framework
+                # return thedf.copy().reset_index(drop=True)
+                return thedf #.copy().reset_index(drop=True)
             # for the runtime scenario, when minimum granule is 1 minute and we do strategy on a 15 min, then 15 min has future knowlege
             # as ohlc candles are left labeled
-            if self.interval_to_seconds(self.minimum_granule_interval) < self.interval_to_seconds(current_data_interval):
+            elif self.interval_to_seconds(self.minimum_granule_interval) < self.interval_to_seconds(current_data_interval):
+
+                thedf = self.get_buffered_instrument_history(current_data_interval, start_datetime = start_datetime)
+
+                # startdate = self.current_iteration_source.loc[0]['date']
+                enddate = self.current_iteration_source.loc[self.current_iteration_index]['date']
+                
+                
+                # thedf = thedf[thedf['date'] >= startdate]
+                thedf = thedf[thedf['date'] <= enddate]
+                
+                bigger_last_candle_datetime = thedf['date'].iloc[-1]
                 thedf = thedf.set_index('date')
+                # only the last index of bigger timeframe needs live data
                 livemimicdf = self.current_iteration_source.iloc[:self.current_iteration_index+1]
+                livemimicdf = livemimicdf[livemimicdf['date']>=bigger_last_candle_datetime]
                 livemimicdf = livemimicdf.set_index('date').resample(BSKiteTicker.get_resample_map()[current_data_interval]).agg({'open':'first','high':'max','low':'min', 'close':'last'}).reset_index()
                 thedf.loc[livemimicdf.iloc[-1]['date']] = livemimicdf.iloc[-1]
                 thedf = thedf.reset_index()
 
-        if self.kite_ticker is not None:
+                return thedf #.copy().reset_index(drop=True)
+        
+
+        elif self.kite_ticker is not None:
+            # real trade scenario
+            
+            thedf = self.get_buffered_instrument_history(current_data_interval, start_datetime = start_datetime)
+
             new_data_df = self.kite_ticker.get_instrument_data(self.instrument[INSTRUMENT_KEY_INSTRUMENT_TOKEN], current_data_interval)
             thedf = thedf.append(new_data_df)
         
-        return thedf.copy().reset_index(drop=True)
+            return thedf #.copy().reset_index(drop=True)
     

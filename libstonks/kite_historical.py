@@ -272,22 +272,28 @@ def sync_instrument_history(instrument_dict, data_interval="day", fetch_past=Tru
         if len(historical_data) < 3 or dateutil.parser.parse(historical_data[-1]['date']) - dateutil.parser.parse(historical_data[0]['date']) < timedelta(days=int(interval_span_days*0.5 - 15)):
             break
 
-def get_instrument_history(instrument_dict, data_interval="day", option_expiry=None, force_refresh=False, parse_date=True, start_datetime:datetime=None, end_datetime:datetime=None, file_chronological_identity=None):
+def get_instrument_history_chronological_identity(instrument_dict, data_interval="day", option_expiry=None):
+    print("CHORONO")
+    result_file = kite_instrument_to_filename(instrument_dict, interval=data_interval, option_expiry=option_expiry)
+    result_file_path = os.path.join(KITE_HISTORICAL_DIRECTORY,result_file)
+    new_chronological_dentity = f"{os.path.getctime(result_file_path)}_{os.path.getmtime(result_file_path)}"
+    return new_chronological_dentity
+
+def get_instrument_history(instrument_dict, data_interval="day", option_expiry=None, force_refresh=False, parse_date=True, start_datetime:datetime=None, end_datetime:datetime=None):
     """gets the instrument history from file, the returned pandas dataframe consists date,open,high,low,close,volume,oi .
     - `file_chronological_identity`: Useful for caching and previnting unnecessary file IO for backetests. returnes the combination of created_date and modified date of file, if it's the same as given param then don't return anything.
     if it's different then new identity and row is returned.
     """
-
+    print("INSTRU HIST")
     if force_refresh:
-        sync_instrument_history(instrument_dict, data_interval="day", fetch_past=False)
+        sync_instrument_history(instrument_dict, data_interval=data_interval, fetch_past=False)
+
     result_file = kite_instrument_to_filename(instrument_dict, interval=data_interval, option_expiry=option_expiry)
     result_file_path = os.path.join(KITE_HISTORICAL_DIRECTORY,result_file)
     df_to_sync = None
     
     if os.path.exists(result_file_path):
-        new_chronological_dentity = f"{os.path.getctime(result_file_path)}_{os.path.getmtime(result_file_path)}"
-        if file_chronological_identity and new_chronological_dentity == file_chronological_identity:
-            return None, None
+        
         df_to_sync = pd.read_csv(result_file_path)
         if start_datetime is not None:
             df_to_sync = df_to_sync[df_to_sync['date'] >= str(start_datetime)].reset_index(drop=True)
@@ -296,11 +302,8 @@ def get_instrument_history(instrument_dict, data_interval="day", option_expiry=N
         if parse_date:    
             # TODO: faster date parsing, and
             #       difference between using date parsing at read_csv level
-            df_to_sync['date'] = df_to_sync['date'].apply(lambda x: dateutil.parser.parse(x))
+            df_to_sync['date'] = df_to_sync['date'].apply(lambda x: datetime.fromisoformat(x))
         
-        if file_chronological_identity:
-            return df_to_sync, new_chronological_dentity
-
         return df_to_sync
     
 

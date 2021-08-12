@@ -3,31 +3,13 @@ from datetime import datetime
 
 import pandas as pd
 import numpy as np
+from pandas.core.series import Series
 
 class INDICATORS:
-    MOVING_AVERAGE = "ma"
-    RELATIVE_STRENGTH_INDEX = "rsi"
-    EXPONENTIAL_MOVING_AVERAGE = "ema"
-    SMOOTHED_MOVING_AVERAGE = "sma"
-    HISTORICAL_VOLATILITY = "hv"
     
     @staticmethod
-    def resolve_indicator_name(indicator_name):
-        # valid: moving_average, moving average, ma, MoVingAveRage
-        indicator_name_fixed = re.sub("[^a-zA-Z]+", "", indicator_name)
-        if indicator_name_fixed.lower() in ['movingaverage', 'ma']:
-            return INDICATORS.MOVING_AVERAGE
-        if indicator_name_fixed.lower() in ['exponentialmovingaverage', 'ema']:
-            return INDICATORS.EXPONENTIAL_MOVING_AVERAGE
-        if indicator_name_fixed.lower() in ['relativestrengthindex', 'rsi']:
-            return INDICATORS.RELATIVE_STRENGTH_INDEX
-        if indicator_name_fixed.lower() in ['historicalvolatility', 'hv']:
-            return INDICATORS.HISTORICAL_VOLATILITY
-        return indicator_name
-    
-    @staticmethod
-    def get_moving_average_indicator(df, length=5, source='close'):
-        return df[source].rolling(length).mean()
+    def get_moving_average_indicator(source:Series, length=5):
+        return source.rolling(length).mean()
     
     @staticmethod
     def get_moving_average_params(indicator_params_dict):
@@ -71,8 +53,11 @@ class INDICATORS:
         return indicator_params_dict
         
     @staticmethod
-    def get_rsi_indicator(df, length=5, source='close', mean_function='ema'):
-        delta = df[source].diff()
+    def get_rsi_indicator(source:Series, length=5, mean_function='sma'):
+        """gets you the rsi indicator values
+        - `mean_function`: ma | ema | sma(default) : the source to use to calculate upmoves and downmoves mean
+        """
+        delta = source.diff()
 #         df['diff'] = df[source].diff()
         upm, downm = delta.copy(), delta.copy()
         upm[upm<0] = 0
