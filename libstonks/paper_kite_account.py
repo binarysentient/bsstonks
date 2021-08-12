@@ -83,7 +83,7 @@ class PaperKiteAccount():
 
         self.trades.append({INSTRUMENT_KEY_TRADINGSYMBOL:tradingsymbol, 'transaction_type':transaction_type, 'price':price,
                             'transaction_datetime':transaction_datetime,  'quantity':quantity})
-        print(f"----->balance: {self.balance:.0f} :",tradingsymbol, transaction_type,transaction_datetime, price)
+        # print(f"----->balance: {self.balance:.0f} :",tradingsymbol, transaction_type,transaction_datetime, price)
         # params = locals()
         # del(params["self"])
         # for k in list(params.keys()):

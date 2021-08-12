@@ -136,12 +136,6 @@ class BSDataOrchestrator():
         if data_interval is not None:
             current_data_interval = data_interval
         
-        if start_datetime is None and self.kite_ticker is None and self.backtest_start_date is not None:
-            start_datetime = self.backtest_start_date
-        
-        
-        
-        
         if self.current_iteration_source is not None:
             # backtest scenario
             if current_data_interval == self.minimum_granule_interval:

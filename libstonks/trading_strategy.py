@@ -1,7 +1,7 @@
 from logging import ERROR
 from kiteconnect.connect import KiteConnect
 from libstonks.paper_kite_account import PaperKiteAccount
-from libstonks.kite_historical import DATA_INTERVAL_15MINUTE, DATA_INTERVAL_MINUTE, INSTRUMENT_KEY_EXCHANGE, INSTRUMENT_KEY_TRADINGSYMBOL
+from libstonks.kite_historical import DATA_INTERVAL_15MINUTE, DATA_INTERVAL_DAY, DATA_INTERVAL_MINUTE, INSTRUMENT_KEY_EXCHANGE, INSTRUMENT_KEY_TRADINGSYMBOL
 from typing import Optional
 from libstonks.bs_kiteconnect import make_kiteconnect_api
 from libstonks.indicators import INDICATORS
@@ -71,6 +71,15 @@ class BaseTradingStrategy():
                 price=price,
                 tag=f"timestamp_{buydate.timestamp()}")
     
+    def get_most_recent_trade(self):
+        recent_trades = self.trading_account.get_trades()
+        if len(recent_trades) > 0:
+            return recent_trades[-1]
+    
+    def get_most_recent_trade_trasaction_type(self):
+        most_recent_trade = self.get_most_recent_trade()
+        if most_recent_trade:
+            return most_recent_trade['transaction_type']
     # instrument: the instrument row/instrument information
     #             expected 'tradingsymbol' key
     # instrument_data: expected price action data with 'date', ..ohlc.. , 'volume'
@@ -126,8 +135,8 @@ class RsiDayEndNextOpenArbitrageTradingStrategy(BaseTradingStrategy):
         
         current_datetime = datadf['date'].iloc[-1]
         current_threshold = current_datetime.hour + current_datetime.minute/60
-        upper_sell_threshold = 9 + 35/60
-        lower_buy_threshold = 15 + 25/60
+        upper_sell_threshold = 9 + 17/60
+        lower_buy_threshold = 15 + 29/60
         # print(current_datetime)
         # print(current_threshold)
         # print(upper_sell_threshold)
@@ -141,6 +150,43 @@ class RsiDayEndNextOpenArbitrageTradingStrategy(BaseTradingStrategy):
         elif len(recent_trades) > 0 and current_threshold <= upper_sell_threshold <= 45.0 and last_trade_transaction_type != KiteConnect.TRANSACTION_TYPE_SELL:
             # NOTE: len(recent_trades) > 0: this condition makes sure you don't sell if you don't own
             self.place_order(quantity=50, transaction_type=KiteConnect.TRANSACTION_TYPE_SELL)
+
+
+class RsiRynerTeo30BuyTradingStrategy(BaseTradingStrategy):
+
+    def __init__(self, data_orchestrator: BSDataOrchestrator, zeordha_like_trading_account: PaperKiteAccount) -> None:
+        super().__init__(data_orchestrator, zeordha_like_trading_account)
+        if self.data_orchestrator.minimum_granule_interval != DATA_INTERVAL_DAY:
+            raise Exception("This trategy only works for Minute interval")
+    
+    def execute_step(self):
+        """the data orchestrator ensures that we never can cheat to look future data in backtest.
+        And the super() place order ensures that we use proper instrument that dataorchestrator is based off of and 
+        that we use perfect latest available price
+        """
+        # this returns minimum granule
+        
+        datadf = self.data_orchestrator.get_ohlc_data_df()
+        rsi10 = INDICATORS.get_rsi_indicator(datadf['close'],length=10, mean_function='ema')
+        ma200 = INDICATORS.get_moving_average_indicator(datadf['close'],length=200)
+        exitdays = 10
+        if len(rsi10) < 2:
+            return
+        most_recent_trade_transaction_type = self.get_most_recent_trade_trasaction_type()
+        if datadf['close'].iloc[-1] > ma200.iloc[-1] and rsi10.iloc[-1] <= 30 and most_recent_trade_transaction_type != KiteConnect.TRANSACTION_TYPE_BUY:
+            print("Place BUY")
+            self.place_order(quantity=1, transaction_type=KiteConnect.TRANSACTION_TYPE_BUY)
+        elif most_recent_trade_transaction_type == KiteConnect.TRANSACTION_TYPE_BUY and rsi10.iloc[-1] >= 40:
+            print("EXIT RSI 40")
+            self.place_order(quantity=1, transaction_type=KiteConnect.TRANSACTION_TYPE_SELL)
+        elif len(rsi10)>=exitdays and datadf['close'].iloc[-exitdays] > ma200.iloc[-exitdays] and rsi10.iloc[-exitdays] <= 30 and most_recent_trade_transaction_type == KiteConnect.TRANSACTION_TYPE_BUY:
+            print("EXIT 10 days")
+            self.place_order(quantity=1, transaction_type=KiteConnect.TRANSACTION_TYPE_SELL)
+        elif datadf['close'].iloc[-1] < ma200.iloc[-1] and most_recent_trade_transaction_type == KiteConnect.TRANSACTION_TYPE_BUY:
+            print("EXIT market bearish")
+            self.place_order(quantity=1, transaction_type=KiteConnect.TRANSACTION_TYPE_SELL)
+
+        
 
 
 def main_test():

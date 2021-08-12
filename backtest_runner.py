@@ -17,7 +17,7 @@ from libstonks import bs_kiteconnect
 from libstonks import bs_kiteticker
 from libstonks.bs_kiteticker import BSKiteTicker
 from libstonks.kite_historical import DATA_INTERVAL_15MINUTE, DATA_INTERVAL_5MINUTE, DATA_INTERVAL_DAY, DATA_INTERVAL_MINUTE, INSTRUMENT_EXCHANGE_NSE, INSTRUMENT_KEY_INSTRUMENT_TOKEN, INSTRUMENT_KEY_TRADINGSYMBOL, INSTRUMENT_SEGMENT_INDICES, get_instrument_history, get_instrument_list
-from libstonks.trading_strategy import BaseTradingStrategy, RsiMidTennisTradingStrategy, RsiDayEndNextOpenArbitrageTradingStrategy
+from libstonks.trading_strategy import BaseTradingStrategy, RsiRynerTeo30BuyTradingStrategy, RsiMidTennisTradingStrategy, RsiDayEndNextOpenArbitrageTradingStrategy
 
 logging.getLogger("matplotlib.font_manager").setLevel(logging.ERROR)
 
@@ -32,10 +32,11 @@ def runner_single_instrument_worker(instrument, backtest_start_date, minimum_gra
     # runnerthread.start()
     # return runnerthread
     paper_kite_account = PaperKiteAccount(500000)
-    rsi_midtennis_strat = RsiMidTennisTradingStrategy(data_orchestrator, paper_kite_account)
-    rsi_nextday_strat = RsiDayEndNextOpenArbitrageTradingStrategy(data_orchestrator, paper_kite_account)
+    # rsi_midtennis_strat = RsiMidTennisTradingStrategy(data_orchestrator, paper_kite_account)
+    # rsi_nextday_strat = RsiDayEndNextOpenArbitrageTradingStrategy(data_orchestrator, paper_kite_account)
+    rsi_rynerteo30buy_strat = RsiRynerTeo30BuyTradingStrategy(data_orchestrator, paper_kite_account)
     idx = 0
-    current_strategy = rsi_nextday_strat
+    current_strategy = rsi_rynerteo30buy_strat
     
     # for _ in range(0,3):
     #     starttime = time.time()
@@ -59,7 +60,8 @@ def analyze_strategy(thestrategy:BaseTradingStrategy):
     pnl_cum = 0
     dates = []
     thecsv_analysis = []
-    for buyt, sellt in zip(thetrades[:-1], thetrades[1:]):
+    for buyt, sellt in zip(thetrades[:-1:2], thetrades[1::2]):
+        
         pnl.append((sellt['price'] - buyt['price'])/buyt['price']*100)
         
         curr_pnl_points = (sellt['price'] - buyt['price'])
@@ -76,7 +78,7 @@ def analyze_strategy(thestrategy:BaseTradingStrategy):
             'cumulative_pnl_points':pnl_cum
         })
     pd.DataFrame(thecsv_analysis).to_csv(f"{thestrategy.__class__.__name__}.csv")
-    
+    # return
     plt.figure()
     plt.title(f"trades:{len(pnl)} , wins:{len([x for x in pnl if x>0])}, losses:{len([x for x in pnl if x<=0])}")
     plt.plot(dates, pnl)
@@ -94,8 +96,9 @@ def analyze_strategy(thestrategy:BaseTradingStrategy):
     plt.show()
 
 if __name__ == "__main__":
-    minimum_granule_interval = DATA_INTERVAL_MINUTE
-    BACKTEST_START_DATE = datetime(2015,1,12)
+    minimum_granule_interval = DATA_INTERVAL_DAY
+    BACKTEST_START_DATE = datetime(2000,1,12)
+    # BACKTEST_START_DATE = datetime(2021,7,12)
     # instrument_list = get_instrument_list(symbol_eq=NIFTY50_TRADINGSYMBOLS, exchange=INSTRUMENT_EXCHANGE_NSE)
 
     instrument_list = get_instrument_list(segment=INSTRUMENT_SEGMENT_INDICES, symbol_eq="NIFTY 50")
