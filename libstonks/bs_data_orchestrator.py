@@ -6,7 +6,7 @@ import traceback
 from typing import Dict
 
 from libstonks.bs_kiteticker import BSKiteTicker, DATA_INTERVAL_TICK
-from libstonks.kite_historical import DATA_INTERVAL_15MINUTE, DATA_INTERVAL_30MINUTE, DATA_INTERVAL_3MINUTE, DATA_INTERVAL_5MINUTE, DATA_INTERVAL_60MINUTE, DATA_INTERVAL_DAY, DATA_INTERVAL_MINUTE, INSTRUMENT_KEY_INSTRUMENT_TOKEN, get_instrument_history, get_instrument_history_chronological_identity
+from libstonks.kite_historical import DATA_INTERVAL_15MINUTE, DATA_INTERVAL_30MINUTE, DATA_INTERVAL_3MINUTE, DATA_INTERVAL_5MINUTE, DATA_INTERVAL_60MINUTE, DATA_INTERVAL_DAY, DATA_INTERVAL_MINUTE, INSTRUMENT_KEY_INSTRUMENT_TOKEN, INSTRUMENT_KEY_SEGMENT, INSTRUMENT_KEY_TRADINGSYMBOL, get_instrument_history, get_instrument_history_chronological_identity
 
 LOGGER = logging.getLogger("kite_historical")
 
@@ -38,6 +38,9 @@ class BSDataOrchestrator():
 
         get_instrument_history(self.instrument, data_interval=self.minimum_granule_interval, force_refresh=True, parse_date=False)
     
+    def __str__(self) -> str:
+        return f"{self.instrument[INSTRUMENT_KEY_TRADINGSYMBOL]}{'_live' if self.kite_ticker else ''}_{self.instrument[INSTRUMENT_KEY_SEGMENT]}"
+
     def __iterate_for_backtest(self):
         self.current_iteration_source = self.get_buffered_instrument_history(self.minimum_granule_interval, start_datetime=self.backtest_start_date)
         
@@ -152,7 +155,7 @@ class BSDataOrchestrator():
                 thedf = self.get_buffered_instrument_history(current_data_interval, start_datetime = start_datetime)
 
                 # startdate = self.current_iteration_source.loc[0]['date']
-                enddate = self.current_iteration_source.loc[self.current_iteration_index]['date']
+                enddate = self.current_iteration_source.at[self.current_iteration_index,'date']
                 
                 
                 # thedf = thedf[thedf['date'] >= startdate]
