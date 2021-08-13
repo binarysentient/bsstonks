@@ -56,7 +56,7 @@ class BaseTradingStrategy():
         self.data_orchestrator = data_orchestrator
         self.trading_account = zeordha_like_trading_account
 
-    def place_order(self, quantity=1, transaction_type=None):
+    def place_order(self, quantity=1, transaction_type=None, verbose=True):
         """place an order
         - `transaction_type`: BUY|SELL, KiteConnect.TRANSACTION_TYPE_BUY
         """
@@ -69,7 +69,7 @@ class BaseTradingStrategy():
                 KiteConnect.PRODUCT_NRML,
                 KiteConnect.ORDER_TYPE_MARKET,
                 price=price,
-                tag=f"timestamp_{buydate.timestamp()}")
+                tag=f"timestamp_{buydate.timestamp()}", verbose=verbose)
     
     def get_most_recent_trade(self):
         recent_trades = self.trading_account.get_trades()

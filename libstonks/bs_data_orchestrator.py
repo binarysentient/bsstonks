@@ -36,7 +36,7 @@ class BSDataOrchestrator():
             self.kite_ticker = kite_ticker
             self.kite_ticker.subscribe(instrument[INSTRUMENT_KEY_INSTRUMENT_TOKEN])
 
-        # get_instrument_history(self.instrument, data_interval=self.minimum_granule_interval, force_refresh=True, parse_date=False)
+        get_instrument_history(self.instrument, data_interval=self.minimum_granule_interval, force_refresh=True, parse_date=False)
     
     def __iterate_for_backtest(self):
         self.current_iteration_source = self.get_buffered_instrument_history(self.minimum_granule_interval, start_datetime=self.backtest_start_date)

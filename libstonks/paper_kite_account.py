@@ -71,7 +71,7 @@ class PaperKiteAccount():
                 squareoff=None,
                 stoploss=None,
                 trailing_stoploss=None,
-                tag=None):
+                tag=None, verbose=True):
         """Place an order."""
         transaction_datetime = datetime.fromtimestamp(float(tag.split('_')[1]))
         
@@ -83,7 +83,8 @@ class PaperKiteAccount():
 
         self.trades.append({INSTRUMENT_KEY_TRADINGSYMBOL:tradingsymbol, 'transaction_type':transaction_type, 'price':price,
                             'transaction_datetime':transaction_datetime,  'quantity':quantity})
-        # print(f"----->balance: {self.balance:.0f} :",tradingsymbol, transaction_type,transaction_datetime, price)
+        if verbose:
+            print(f"----->balance: {self.balance:.0f} :",tradingsymbol, transaction_type,transaction_datetime, price)
         # params = locals()
         # del(params["self"])
         # for k in list(params.keys()):
