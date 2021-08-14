@@ -110,8 +110,11 @@ instrument_type: ['CE' 'PE' 'FUT' 'EQ']
 exchange: ['BCD' 'BSE' 'MCX' 'NSE' 'CDS' 'NFO']
 NFO exchange instrument types: ['CE' 'PE' 'FUT']
 '''
-def search_instruments_in_df(instruments_df, search_result_as_copy=True, instrument_type=None, exchange=None, segment=None, force_refresh=False, symbol_contained=None, name_contained=None, symbol_eq=None, name_eq=None):
+def search_instruments_in_df(instruments_df:DataFrame, search_result_as_copy=True, instrument_type=None, exchange=None, segment=None, force_refresh=False, symbol_contained=None, name_contained=None, symbol_eq=None, name_eq=None, exclude_no_name=True):
     thedf = instruments_df
+    if exclude_no_name is True:
+        thedf = thedf[thedf['name'].notna()]
+        
     if instrument_type is not None:
         if type(instrument_type) == str:
             instrument_type = [instrument_type]
@@ -143,9 +146,11 @@ def search_instruments_in_df(instruments_df, search_result_as_copy=True, instrum
         return thedf
 
 _cache_get_instrument_list_df = None
-def get_instrument_list(instrument_type=None, exchange=None, segment=None, force_refresh=False, symbol_contained=None, name_contained=None, symbol_eq=None, name_eq=None) -> pd.DataFrame:
+def get_instrument_list(instrument_type=None, exchange=None, segment=None, force_refresh=False, symbol_contained=None, name_contained=None, symbol_eq=None, name_eq=None, exclude_no_name=True) -> pd.DataFrame:
     """Returns the instruments dataframe based on criteria. If no parameters then returns all available instruments at zerodha
-    - `exchange`: NSE or BSE or NFO or more.. """
+    - `exchange`: NSE or BSE or NFO or more.. 
+    - `exclude_no_name`: there are some junk symbols like 415KL22-SG, to filter them out we can discard everything that has no name value
+    """
     if force_refresh:
         sync_instrument_list()
 
@@ -154,7 +159,7 @@ def get_instrument_list(instrument_type=None, exchange=None, segment=None, force
         _cache_get_instrument_list_df = pd.read_csv(os.path.join(KITE_INSTRUMENTS_DIRECTORY,"instrument_list.csv"))
     thedf = _cache_get_instrument_list_df
 
-    return search_instruments_in_df(thedf, search_result_as_copy=True, instrument_type=instrument_type, exchange=exchange, segment=segment, force_refresh=force_refresh, symbol_contained=symbol_contained, name_contained=name_contained, symbol_eq=symbol_eq, name_eq=name_eq) 
+    return search_instruments_in_df(thedf, search_result_as_copy=True, instrument_type=instrument_type, exchange=exchange, segment=segment, force_refresh=force_refresh, symbol_contained=symbol_contained, name_contained=name_contained, symbol_eq=symbol_eq, name_eq=name_eq, exclude_no_name=exclude_no_name) 
 
 def search_options_for_instrument_in_df(thedf, instrument):
     return search_instruments_in_df(thedf, name_eq=instrument[INSTRUMENT_KEY_TRADINGSYMBOL], segment=INSTRUMENT_SEGMENT_NFO_OPT)
