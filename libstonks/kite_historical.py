@@ -280,7 +280,6 @@ def sync_instrument_history(instrument_dict, data_interval="day", fetch_past=Tru
             break
 
 def get_instrument_history_chronological_identity(instrument_dict, data_interval="day", option_expiry=None):
-    print("CHORONO")
     result_file = kite_instrument_to_filename(instrument_dict, interval=data_interval, option_expiry=option_expiry)
     result_file_path = os.path.join(KITE_HISTORICAL_DIRECTORY,result_file)
     new_chronological_dentity = f"{os.path.getctime(result_file_path)}_{os.path.getmtime(result_file_path)}"
@@ -291,7 +290,6 @@ def get_instrument_history(instrument_dict, data_interval="day", option_expiry=N
     - `file_chronological_identity`: Useful for caching and previnting unnecessary file IO for backetests. returnes the combination of created_date and modified date of file, if it's the same as given param then don't return anything.
     if it's different then new identity and row is returned.
     """
-    print("INSTRU HIST")
     if force_refresh:
         sync_instrument_history(instrument_dict, data_interval=data_interval, fetch_past=False)
 

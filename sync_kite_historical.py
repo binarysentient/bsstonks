@@ -33,7 +33,8 @@ if __name__ == "__main__":
         for _, row_nse_eq in all_instruments_nse_eq.iterrows():
             print(f"{row_nse_eq[INSTRUMENT_KEY_TRADINGSYMBOL]} - 15minute")
             # only fetch when there's daily data available
-            if len(get_instrument_history(row_nse_eq, parse_date=False)) > 0:
+            dailydf = get_instrument_history(row_nse_eq, parse_date=False)
+            if dailydf is not None and len(dailydf) > 0:
                 sync_instrument_history(row_nse_eq, data_interval="15minute", fetch_past=FETCH_PAST, stale_threshold_days=STALE_THRESHOLD_DAYS)
 
     if TO_SYNC_OPTIONS_DAILY:
