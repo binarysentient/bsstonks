@@ -171,7 +171,7 @@ def get_instrument_by_symbol(symbol):
 def throttled_historical_data_api(instrument_token, start_datetime, end_datetime, data_interval, oi=True, continuous=False):
     return make_kiteconnect_api().historical_data(instrument_token, start_datetime.strftime("%Y-%m-%d"), end_datetime.strftime("%Y-%m-%d"), data_interval, oi=oi, continuous=continuous)
 
-def sync_instrument_history(instrument_dict, data_interval="day", fetch_past=True):
+def sync_instrument_history(instrument_dict, data_interval="day", fetch_past=True, stale_threshold_days=0):
     interval_data_span_limit = {
         'day': 2000,
         '60minute':400,
@@ -199,6 +199,8 @@ def sync_instrument_history(instrument_dict, data_interval="day", fetch_past=Tru
     if not os.path.exists(result_file_path):
         df_to_sync = pd.DataFrame([],columns=["date","open","high","low","close","volume","oi"])
     else:
+        if stale_threshold_days*24*60*60 > (datetime.now().timestamp() - os.path.getmtime(result_file_path)):
+            return
         df_to_sync = pd.read_csv(result_file_path,index_col=False)
 
     #     
