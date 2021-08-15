@@ -17,7 +17,7 @@ import matplotlib.pyplot as plt
 from libstonks import bs_kiteconnect
 from libstonks import bs_kiteticker
 from libstonks.bs_kiteticker import BSKiteTicker
-from libstonks.kite_historical import BSSTONKS_DIRECTORY, DATA_INTERVAL_15MINUTE, DATA_INTERVAL_5MINUTE, DATA_INTERVAL_DAY, DATA_INTERVAL_MINUTE, INSTRUMENT_EXCHANGE_NSE, INSTRUMENT_KEY_INSTRUMENT_TOKEN, INSTRUMENT_KEY_TRADINGSYMBOL, INSTRUMENT_SEGMENT_INDICES, get_instrument_history, get_instrument_list
+from libstonks.kite_historical import BSSTONKS_DIRECTORY, DATA_INTERVAL_15MINUTE, DATA_INTERVAL_5MINUTE, DATA_INTERVAL_DAY, DATA_INTERVAL_MINUTE, INSTRUMENT_EXCHANGE_NSE, INSTRUMENT_KEY_INSTRUMENT_TOKEN, INSTRUMENT_KEY_TRADINGSYMBOL, INSTRUMENT_SEGMENT_INDICES, INSTRUMENT_SEGMENT_NFO_FUT, get_instrument_history, get_instrument_list
 from libstonks.trading_strategy import BaseTradingStrategy, RsiDualThresholdTradingStrategy, RsiRynerTeo30BuyTradingStrategy, RsiMidTennisTradingStrategy, RsiDayEndNextOpenArbitrageTradingStrategy
 
 logging.getLogger("matplotlib.font_manager").setLevel(logging.ERROR)
@@ -37,7 +37,7 @@ def runner_single_instrument_worker(instrument, backtest_start_date, minimum_gra
     paper_kite_account = PaperKiteAccount(500000)
     # rsi_midtennis_strat = RsiMidTennisTradingStrategy()
     # rsi_nextday_strat = RsiDayEndNextOpenArbitrageTradingStrategy()
-    rsi_dual_strat = RsiDualThresholdTradingStrategy(data_interval_decision=DATA_INTERVAL_15MINUTE, lower_crossover_buy_threshold=40, upper_crossover_sell_threshold=60)
+    rsi_dual_strat = RsiDualThresholdTradingStrategy(data_interval_decision=DATA_INTERVAL_DAY, lower_crossover_buy_threshold=40, upper_crossover_sell_threshold=60)
     # rsi_rynerteo30buy_strat = RsiRynerTeo30BuyTradingStrategy()
     idx = 0
     current_strategy = rsi_dual_strat
@@ -99,12 +99,13 @@ def analyze_strategy(thestrategy:BaseTradingStrategy, data_orchestrator:BSDataOr
 
 
 if __name__ == "__main__":
-    minimum_granule_interval = DATA_INTERVAL_15MINUTE
-    BACKTEST_START_DATE = datetime(2021,8,1)
+    minimum_granule_interval = DATA_INTERVAL_DAY
+    BACKTEST_START_DATE = datetime(2015,8,1)
     # BACKTEST_START_DATE = datetime(2021,7,12)
     # instrument_list = get_instrument_list(symbol_eq=NIFTY50_TRADINGSYMBOLS, exchange=INSTRUMENT_EXCHANGE_NSE)
 
-    instrument_list = get_instrument_list(segment=INSTRUMENT_SEGMENT_INDICES, symbol_eq="NIFTY 50")
+    # instrument_list = get_instrument_list(segment=INSTRUMENT_SEGMENT_INDICES, symbol_eq="NIFTY 50")
+    instrument_list = get_instrument_list(segment=INSTRUMENT_SEGMENT_NFO_FUT, symbol_contained=["NIFTY"])
     # kite_historical.get_instrument_history(instrument_list.iloc[0]) #, force_refresh=True)
     print(instrument_list)
     # exit()

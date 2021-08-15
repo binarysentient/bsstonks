@@ -36,7 +36,7 @@ class BSDataOrchestrator():
             self.kite_ticker = kite_ticker
             self.kite_ticker.subscribe(instrument[INSTRUMENT_KEY_INSTRUMENT_TOKEN])
 
-        get_instrument_history(self.instrument, data_interval=self.minimum_granule_interval, force_refresh=True, parse_date=False)
+        # get_instrument_history(self.instrument, data_interval=self.minimum_granule_interval, force_refresh=True, parse_date=False)
     
     def __str__(self) -> str:
         return f"{self.instrument[INSTRUMENT_KEY_TRADINGSYMBOL]}{'_live' if self.kite_ticker else ''}_{self.instrument[INSTRUMENT_KEY_SEGMENT]}"
